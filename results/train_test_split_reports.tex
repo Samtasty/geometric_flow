@@ -1,0 +1,126 @@
+% Refreshed after fixing the behavior-policy self-evaluation bug.
+% Sources:
+% - results/attempts_user_split_trunc30_testonly_ep10_bs16000/report.html
+% - results/skill_builder_user_split_trunc50_testonly_ep10_bs16000/report.html
+% - results/assistments8000_user_split_trunc50_testonly_ep10_bs16000/report.html
+% - results/pix_user_split_trunc30_testonly_ep10_bs16000/report.html
+
+\section{Train/Test Split Results}
+\label{sec:train_test_split_results}
+
+We also report held-out user-split results. In each dataset, behavior models and target policies are fit on train users only, and evaluation is performed on disjoint test users with the same fixed target context distribution. The tables below use the refreshed behavior-policy rows obtained after correcting the logger self-evaluation bug; this mainly changes the behavior baselines and is most visible on \texttt{PIX}, with smaller but non-negligible changes on \texttt{attempts} and \texttt{skill\_builder}.
+
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lrrrrrrrrrrrrrrr}
+\toprule
+Dataset & First r. & Last r. & IPS$_1$ & IPS$_T$ & $\Delta$IPS & SNIPS$_1$ & SNIPS$_T$ & $\Delta$SNIPS & DR$_1$ & DR$_T$ & $\Delta$DR & MIS$_1$ & MIS$_T$ & $\Delta$MIS & DM$_1$ & DM$_T$ & $\Delta$DM \\
+\midrule
+Attempts & 0 & 29 & 1.690 & 2.333 & +0.643 & 1.693 & 2.155 & +0.462 & 1.723 & 2.130 & +0.408 & 1.690 & 2.256 & +0.566 & 1.645 & 2.008 & +0.363 \\
+Skill Builder & 0 & 49 & 0.661 & 0.876 & +0.214 & 0.661 & 0.876 & +0.215 & 0.657 & 0.872 & +0.215 & 0.661 & 0.878 & +0.217 & 0.823 & 0.882 & +0.059 \\
+Assistments8000 & 0 & 49 & 0.575 & 0.650 & +0.075 & 0.575 & 0.643 & +0.068 & 0.576 & 0.641 & +0.065 & 0.575 & 0.651 & +0.075 & 0.616 & 0.648 & +0.031 \\
+PIX & 0 & 29 & 0.324 & 1.745 & +1.420 & 0.324 & 2.189 & +1.865 & 0.374 & 2.147 & +1.773 & 0.324 & 2.143 & +1.819 & 0.362 & 2.155 & +1.793 \\
+\bottomrule
+\end{tabular}
+}
+\caption{Train-split behavior policy evaluated at the first and last round-specific behavior models, using the same fixed target context distribution. This directly shows whether the logging policy improves over the interaction horizon.}
+\label{tab:train_test_behavior_first_last}
+\end{table*}
+
+Table~\ref{tab:train_test_behavior_first_last} shows that the logging policy improves over rounds on all four datasets. The effect is modest on \texttt{assistments8000}, moderate on \texttt{skill\_builder}, clearer on \texttt{attempts}, and very strong on \texttt{PIX}. This is useful context for the learned-policy results: some of the gain comes from learning a better policy than the final logger, but part of the overall structure of the problem is that the behavior policy itself already improves over time.
+
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lllrrrrrr}
+\toprule
+
+Dataset & Split & Policy & IPS & SNIPS & DR & MIS & DM & ESS (logged) \\
+\midrule
+Attempts & Train & Behavior & 2.333 & 2.155 & 2.130 & -- & 2.008 & 38,271 \\
+Attempts & Train & IRT oracle & 1.866 & 2.472 & 2.476 & -- & 2.435 & 13,312 \\
+Attempts & Train & Learned IPS & 2.991 & 2.524 & 2.550 & -- & 2.246 & 29,823 \\
+Attempts & Train & Learned SNIPS & 2.951 & 2.551 & 2.583 & -- & 2.279 & 28,624 \\
+Attempts & Train & Learned DR & 2.880 & 2.555 & 2.588 & -- & 2.300 & 27,518 \\
+\midrule
+Skill Builder & Train & Behavior & 0.876 & 0.876 & 0.872 & -- & 0.882 & 364,801 \\
+Skill Builder & Train & IRT oracle & 0.817 & 1.054 & 1.098 & -- & 1.169 & 37,293 \\
+Skill Builder & Train & Learned IPS & 1.262 & 1.075 & 1.072 & -- & 1.079 & 157,039 \\
+Skill Builder & Train & Learned SNIPS & 1.225 & 1.083 & 1.083 & -- & 1.095 & 152,343 \\
+Skill Builder & Train & Learned DR & 1.177 & 1.085 & 1.093 & -- & 1.118 & 132,048 \\
+\midrule
+Assistments8000 & Train & Behavior & 0.650 & 0.643 & 0.641 & -- & 0.648 & 62,259 \\
+Assistments8000 & Train & IRT oracle & 0.467 & 0.537 & 0.618 & -- & 0.786 & 7,059 \\
+Assistments8000 & Train & Learned IPS & 0.686 & 0.679 & 0.685 & -- & 0.652 & 63,148 \\
+Assistments8000 & Train & Learned SNIPS & 0.686 & 0.683 & 0.689 & -- & 0.658 & 59,983 \\
+Assistments8000 & Train & Learned DR & 0.682 & 0.681 & 0.688 & -- & 0.664 & 60,172 \\
+\midrule
+PIX & Train & Behavior & 1.745 & 2.189 & 2.147 & 2.142 & 2.155 & 1,057,081 \\
+PIX & Train & IRT oracle & 2.189 & 2.895 & 2.908 & 2.646 & 2.735 & 222,317 \\
+PIX & Train & Learned IPS & 2.764 & 2.994 & 2.985 & 3.104 & 2.652 & 274,959 \\
+PIX & Train & Learned SNIPS & 2.658 & 3.051 & 3.017 & 2.990 & 2.690 & 211,777 \\
+PIX & Train & Learned DR & 2.709 & 3.049 & 3.022 & 3.045 & 2.695 & 240,747 \\
+PIX & Train & Learned MIS & 2.663 & 2.611 & 2.611 & 3.350 & 2.485 & 505,240 \\
+\bottomrule
+\end{tabular}
+}
+\caption{Train-split results for the refreshed user-split reports.}
+\label{tab:train_test_results_train}
+\end{table*}
+
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lllrrrrrr}
+\toprule
+Dataset & Split & Policy & IPS & SNIPS & DR & MIS & DM & ESS (logged) \\
+\midrule
+Attempts & Test & Behavior & 2.271 & 2.139 & 2.114 & -- & 2.011 & 4,541 \\
+Attempts & Test & IRT oracle & 1.791 & 2.444 & 2.450 & -- & 2.437 & 1,574 \\
+Attempts & Test & Learned IPS & 2.915 & 2.517 & 2.535 & -- & 2.251 & 3,653 \\
+Attempts & Test & Learned SNIPS & 2.866 & 2.536 & 2.561 & -- & 2.286 & 3,510 \\
+Attempts & Test & Learned DR & 2.801 & 2.544 & 2.570 & -- & 2.307 & 3,363 \\
+\midrule
+Skill Builder & Test & Behavior & 0.882 & 0.883 & 0.877 & -- & 0.884 & 43,126 \\
+Skill Builder & Test & IRT oracle & 0.759 & 1.053 & 1.094 & -- & 1.171 & 3,950 \\
+Skill Builder & Test & Learned IPS & 1.294 & 1.079 & 1.076 & -- & 1.082 & 18,519 \\
+Skill Builder & Test & Learned SNIPS & 1.248 & 1.089 & 1.089 & -- & 1.098 & 17,761 \\
+Skill Builder & Test & Learned DR & 1.187 & 1.091 & 1.098 & -- & 1.121 & 15,354 \\
+\midrule
+Assistments8000 & Test & Behavior & 0.657 & 0.638 & 0.634 & -- & 0.643 & 6,172 \\
+Assistments8000 & Test & IRT oracle & 0.587 & 0.611 & 0.630 & -- & 0.770 & 538 \\
+Assistments8000 & Test & Learned IPS & 0.681 & 0.671 & 0.679 & -- & 0.644 & 7,070 \\
+Assistments8000 & Test & Learned SNIPS & 0.679 & 0.672 & 0.681 & -- & 0.649 & 6,885 \\
+Assistments8000 & Test & Learned DR & 0.675 & 0.671 & 0.679 & -- & 0.655 & 6,884 \\
+\midrule
+PIX & Test & Behavior & 1.731 & 2.184 & 2.144 & 2.143 & 2.155 & 136,862 \\
+PIX & Test & IRT oracle & 2.148 & 2.889 & 2.902 & 2.624 & 2.736 & 27,549 \\
+PIX & Test & Learned IPS & 2.735 & 2.984 & 2.975 & 3.092 & 2.653 & 33,993 \\
+PIX & Test & Learned SNIPS & 2.610 & 3.045 & 3.007 & 2.967 & 2.690 & 26,113 \\
+PIX & Test & Learned DR & 2.673 & 3.043 & 3.014 & 3.027 & 2.696 & 29,612 \\
+PIX & Test & Learned MIS & 2.647 & 2.601 & 2.600 & 3.346 & 2.486 & 62,803 \\
+\bottomrule
+\end{tabular}
+}
+\caption{Held-out test results for the refreshed user-split reports.}
+\label{tab:train_test_results_test}
+\end{table*}
+
+The held-out conclusions remain largely unchanged after the fix, but the comparison to behavior is now cleaner. On \texttt{attempts}, \texttt{skill\_builder}, and \texttt{PIX}, the learned policies still improve substantially over behavior on the test split. On \texttt{attempts}, DR remains the strongest balanced policy, with the best test DR ($2.570$) and DM ($2.307$), both above behavior. On \texttt{skill\_builder}, the three learned policies are close, but DR again has the strongest DM value. On \texttt{PIX}, the matched-objective pattern remains clear: IPS is best on IPS, SNIPS on SNIPS, DR on DR and DM, and MIS on MIS.
+
+\texttt{Assistments8000} remains the weak case. The learned policies are only slightly above behavior under IPS/SNIPS/DR, and all of them remain below the oracle under DM. This is still the dataset where the evidence for policy improvement is least robust.
+
+The refreshed HTML reports are:
+\begin{itemize}
+\item \texttt{results/attempts\_user\_split\_trunc30\_testonly\_ep10\_bs16000/report.html}
+\item \texttt{results/skill\_builder\_user\_split\_trunc50\_testonly\_ep10\_bs16000/report.html}
+\item \texttt{results/assistments8000\_user\_split\_trunc50\_testonly\_ep10\_bs16000/report.html}
+\item \texttt{results/pix\_user\_split\_trunc30\_testonly\_ep10\_bs16000/report.html}
+\end{itemize}

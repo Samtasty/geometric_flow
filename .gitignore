@@ -1,0 +1,16 @@
+# Data
+data/
+
+# Heavy notebooks
+notebooks/ktm_gaussian_animation.executed.ipynb
+notebooks/efa_competence.ipynb
+notebooks/efa_per_competence.ipynb
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# OS
+.DS_Store

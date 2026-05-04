@@ -1,0 +1,56 @@
+# Example config for M-IRT training
+experiment:
+  seed: 42
+  emb_dim: 2
+  batch_size: 128
+  lr: 0.01
+  epochs: 10
+  dataset_path: "data/data.csv"
+  run_sakt: false
+  sakt:
+    max_seq_len: 50
+    emb_dim: 64
+    num_heads: 4
+    dropout: 0.2
+    train_ratio: 0.8
+    batch_size: 128
+    lr: 0.001
+    epochs: 10
+  run_mirt_elo: False
+  mirt_elo:
+    emb_dim: 2
+    lr: 0.05
+    epochs: 1
+    lr_decay: 0.0
+    decay_mode: "sqrt"
+    l2: 0.0
+    init_std: 0.01
+  run_mgirt_elo: False
+  mgirt_elo:
+    emb_dim: 5
+    alpha: 1.0
+    beta: 1.0
+    lr_item: 0.01
+    lr_pos: 0.05
+    lr_neg: 0.05
+    epochs: 10
+    lr_decay: 0.0
+    decay_mode: "sqrt"
+    l2: 0.0
+    init_std: 0.01
+    normalize_items: false
+  run_mgirt_mle: True
+  mgirt_mle:
+    emb_dim: 4
+    alpha: 2.0
+    beta: 2.0
+    batch_size: 128
+    lr: 0.01
+    epochs: 20
+    weight_decay: 0.0
+    val_split: 0.1
+    chronological_val: true
+    early_stopping: true
+    patience: 1
+    min_delta: 0.0
+    plot_path: "visualization/mgirt_mle_losses.png"

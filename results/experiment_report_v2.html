@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Off-Policy Evaluation Experiment Report — v2</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 1100px; margin: 40px auto; padding: 0 24px; color: #222; line-height: 1.6; }
+  h1 { border-bottom: 2px solid #333; padding-bottom: 8px; }
+  h2 { border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-top: 40px; }
+  h3 { margin-top: 28px; color: #444; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 0.93em; }
+  th { background: #2c3e50; color: #fff; padding: 8px 12px; text-align: left; }
+  td { padding: 7px 12px; border-bottom: 1px solid #e0e0e0; }
+  tr:nth-child(even) td { background: #f8f9fa; }
+  tr.behavior td { background: #eaf4fb; font-style: italic; }
+  tr.best td { background: #eafaf1; }
+  tr.excluded td { background: #fff3cd; }
+  code { background: #f4f4f4; padding: 2px 5px; border-radius: 3px; font-size: 0.9em; }
+  pre { background: #f4f4f4; padding: 14px; border-radius: 5px; overflow-x: auto; font-size: 0.88em; }
+  .meta { color: #666; font-size: 0.9em; margin-bottom: 24px; }
+  .note { background: #fff8dc; border-left: 4px solid #f0ad4e; padding: 10px 14px; margin: 12px 0; border-radius: 0 4px 4px 0; font-size: 0.92em; }
+  .highlight { font-weight: bold; color: #2c7a2c; }
+  .section-label { display: inline-block; background: #2c3e50; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.8em; margin-right: 6px; vertical-align: middle; }
+  .toc { background: #f8f9fa; border: 1px solid #ddd; padding: 16px 24px; border-radius: 5px; display: inline-block; margin-bottom: 28px; }
+  .toc a { color: #2c3e50; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc li { margin: 4px 0; }
+  .formula { font-family: "Georgia", serif; font-style: italic; background: #f9f9f9; padding: 8px 16px; border-left: 3px solid #aaa; margin: 10px 0; }
+  .dataset-tag { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 0.8em; font-weight: bold; color: white; }
+  .tag-attempts { background: #3498db; }
+  .tag-assistments { background: #e67e22; }
+  .tag-skill { background: #27ae60; }
+  .tag-pix { background: #8e44ad; }
+  .improvement { font-size: 1.05em; font-weight: bold; color: #2c7a2c; }
+</style>
+</head>
+<body>
+
+<h1>Off-Policy Evaluation Experiment Report — v2</h1>
+<p class="meta"><strong>Date:</strong> 2026-03-12 &nbsp;|&nbsp; <strong>Status:</strong> All four datasets complete</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#objective">Objective</a></li>
+    <li><a href="#data">Data &amp; Preprocessing</a></li>
+    <li><a href="#behavior">Behavior Policy Fitting</a></li>
+    <li><a href="#reward">Off-Policy Reward &amp; Propensity</a></li>
+    <li><a href="#context">Context Reweighting</a></li>
+    <li><a href="#policy">Learned Policy</a></li>
+    <li><a href="#estimators">Estimators</a></li>
+    <li><a href="#results">Results</a></li>
+    <li><a href="#coefficients">Learned Policy Coefficients</a></li>
+    <li><a href="#technical">Technical Notes</a></li>
+    <li><a href="#files">Output Files</a></li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="objective">1. Objective</h2>
+<p>Learn a better item-assignment policy from logged student interaction data using <strong>off-policy evaluation (OPE)</strong>. Given a student's current proficiency θ and the round they are on, we want to find a policy π(δ | θ) over item difficulty δ that maximises expected reward:</p>
+<div class="formula">reward = correct × (δ − δ<sub>min</sub>)</div>
+<p>This encourages assigning harder items that students can answer correctly.</p>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="data">2. Data &amp; Preprocessing</h2>
+
+<h3>Datasets</h3>
+<table>
+  <tr><th>Dataset</th><th>Source</th><th>Raw rows</th><th>Truncation</th><th>Students (split)</th></tr>
+  <tr><td><span class="dataset-tag tag-attempts">attempts</span></td><td><code>attempts_sensitivity_0p10/ktm_dataframe.csv</code></td><td>~234k</td><td>round ≤ 30</td><td>~20,556 (16.4k / 2.1k / 2.1k)</td></tr>
+  <tr><td><span class="dataset-tag tag-assistments">assistments8000</span></td><td><code>assistments8000_trunc50/ktm_dataframe.csv</code></td><td>~98k</td><td>round ≤ 50</td><td>~4,066 (3.3k / 0.4k / 0.4k)</td></tr>
+  <tr><td><span class="dataset-tag tag-skill">skill_builder</span></td><td><code>skill_builder_trunc50/ktm_dataframe.csv</code></td><td>~473k</td><td>round ≤ 50</td><td>~14,567 (11.7k / 1.5k / 1.5k)</td></tr>
+  <tr><td><span class="dataset-tag tag-pix">pix</span></td><td><code>pix_mapping/.../ktm_dataframe.csv</code></td><td>~3.2M</td><td>last 30 rounds/student (tail cap)</td><td>100,000 (80k / 10k / 10k)</td></tr>
+</table>
+
+<p>Each dataset starts as a KTM (Knowledge Tracing Model) dataframe with columns:</p>
+<ul>
+  <li><code>user</code>, <code>item</code>, <code>correct</code> — student, question, outcome (0/1)</li>
+  <li><code>proficiency</code> (θ) — IRT-estimated student ability</li>
+  <li><code>difficulties</code> (δ) — IRT-estimated item difficulty</li>
+  <li><code>order_sequence</code> — the attempt number for this student (0-indexed round)</li>
+</ul>
+
+<h3>IRT Model</h3>
+<div class="formula">P(correct | θ, δ) = sigmoid(θ − δ)</div>
+<p>Proficiency θ and difficulty δ are estimated by the KTM pipeline prior to these experiments.</p>
+
+<h3>User-Level Train / Validation / Test Split</h3>
+<p>Students are split <strong>80% / 10% / 10%</strong> at the user level (not row level), ensuring no data leakage across splits. All rows for a given student land in exactly one split.</p>
+<table>
+  <tr><th>Split</th><th>Used for</th></tr>
+  <tr><td><strong>Train (80%)</strong></td><td>Fitting the behavior policy (MLE) + training learned policies</td></tr>
+  <tr><td><strong>Val (10%)</strong></td><td>Held out (no early stopping in these experiments)</td></tr>
+  <tr><td><strong>Test (10%)</strong></td><td>Evaluation only — all reported estimator values</td></tr>
+</table>
+<p>For <strong>pix</strong>, each student's history is capped to their <strong>last 30 rounds</strong> (<code>round_cap_strategy=tail</code>), so students with &gt;30 attempts retain only the most recent 30. The maximum <code>order_sequence</code> is 49 (students with 50+ rounds retain rounds 20–49).</p>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="behavior">3. Behavior Policy Fitting</h2>
+
+<p>For each dataset and each round <em>k</em>, a truncated Gaussian behavior policy is fit on the <strong>train split</strong>:</p>
+<div class="formula">π<sub>b</sub>(δ | θ, k) = TruncNormal(μ<sub>k</sub>(θ), σ<sub>k</sub>(θ)²; [δ<sub>min</sub> − ε, δ<sub>max</sub> + ε])</div>
+<ul>
+  <li><em>μ<sub>k</sub>(θ) = β<sub>μ,0</sub> + β<sub>μ,1</sub>·θ</em> (degree-1 polynomial)</li>
+  <li><em>log σ<sub>k</sub>(θ) = β<sub>σ,0</sub> + β<sub>σ,1</sub>·θ + β<sub>σ,2</sub>·θ²</em> (degree-2 polynomial)</li>
+  <li>Support expanded by ε = 1×10<sup>−4</sup> to avoid float32 boundary artifacts</li>
+  <li>Fitted via <strong>L-BFGS-B</strong> minimising the truncated Gaussian negative log-likelihood</li>
+</ul>
+
+<h3>Auto-Exclusion of Poorly-Fitted Rounds</h3>
+<p>Rounds with <strong>RMSE &gt; 5.0</strong> are automatically excluded from training data and MIS estimation. This catches degenerate optimizer solutions (μ ≪ δ<sub>min</sub> with huge σ → near-uniform distribution).</p>
+<table>
+  <tr><th>Dataset</th><th>Excluded rounds</th><th>RMSE of excluded</th></tr>
+  <tr class="excluded"><td>attempts</td><td>5, 6, 7</td><td>16.1, 30.2, 30.2</td></tr>
+  <tr><td>assistments8000</td><td>none</td><td>—</td></tr>
+  <tr><td>skill_builder</td><td>none</td><td>—</td></tr>
+  <tr class="excluded"><td>pix</td><td>0</td><td>16.4</td></tr>
+</table>
+
+<h3>Behavior Policy Value — First vs. Last Round (Test Split, Context-Reweighted)</h3>
+<p>Raw mean reward and context-reweighted mean reward (see §5 for context weighting) for the first and last round on the test split, under the logged (behavior) policy.</p>
+<table>
+  <tr><th>Dataset</th><th>First round</th><th>n (test)</th><th>Raw mean reward</th><th>Context-reweighted</th><th>Last round</th><th>n (test)</th><th>Raw mean reward</th><th>Context-reweighted</th></tr>
+  <tr><td>attempts</td><td>0</td><td>2,055</td><td>1.556</td><td>1.612</td><td>29</td><td>188</td><td>2.008</td><td>1.775</td></tr>
+  <tr><td>assistments8000</td><td>0</td><td>406</td><td>0.544</td><td>0.599</td><td>49</td><td>97</td><td>0.575</td><td>0.549</td></tr>
+  <tr><td>skill_builder</td><td>0</td><td>1,456</td><td>0.654</td><td>0.661</td><td>49</td><td>456</td><td>0.842</td><td>0.839</td></tr>
+  <tr><td>pix*</td><td>1*</td><td>2,954</td><td>1.107</td><td>1.111</td><td>49</td><td>55</td><td>1.923</td><td>1.828</td></tr>
+</table>
+<p class="note">* pix round 0 excluded (RMSE 16.4); first valid round shown is 1. Context-reweighted values use histogram density ratio q<sub>target</sub>(θ)/q<sub>round k</sub>(θ), normalized, clipped at 20. For the last round, the context ratio ≈ 1 by construction (last round ≈ target context).</p>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="reward">4. Off-Policy Reward &amp; Propensity</h2>
+
+<h3>Reward</h3>
+<div class="formula">r<sub>i</sub> = correct<sub>i</sub> × (δ<sub>i</sub> − δ<sub>min</sub>)</div>
+<p>δ<sub>min</sub> is the global minimum difficulty across the full dataset.</p>
+
+<h3>Propensity</h3>
+<div class="formula">log π<sub>b</sub>(δ<sub>i</sub> | θ<sub>i</sub>, k<sub>i</sub>) = log TruncNormal(δ<sub>i</sub>; μ<sub>k</sub>(θ<sub>i</sub>), σ<sub>k</sub>(θ<sub>i</sub>))</div>
+<p>Computed using <code>log_ndtr</code> (scipy) with survival-function branch switching for numerical stability:</p>
+<ul>
+  <li>For α &gt; 0: <code>log Z = log[Φ(−α) − Φ(−β)]</code> (SF branch)</li>
+  <li>For α ≤ 0: <code>log Z = log[Φ(β) − Φ(α)]</code> (CDF branch)</li>
+</ul>
+<p>This matches exactly the implementation in <code>GlobalGaussianPolicy.log_prob</code> (PyTorch, float64 precision), ensuring IS weights average to ≈ 1 for the behavior policy.</p>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="context">5. Context Reweighting</h2>
+
+<p>All estimators target the <strong>last round's θ distribution</strong>. A histogram density ratio is computed per sample:</p>
+<div class="formula">c<sub>i</sub> = q<sub>target</sub>(θ<sub>i</sub>) / q<sub>round(i)</sub>(θ<sub>i</sub>)</div>
+<p>where q<sub>target</sub> is the empirical θ histogram of a <em>target round</em> selected from the first half of rounds by minimum Jensen-Shannon divergence to the last round. Ratios are clipped at 20 and normalized to mean 1.</p>
+
+<h3>Target Round Selection</h3>
+<table>
+  <tr><th>Dataset</th><th>Last round</th><th>Target round (first half)</th><th>Mean JS divergence</th></tr>
+  <tr><td>attempts</td><td>29</td><td>15</td><td>0.0499</td></tr>
+  <tr><td>assistments8000</td><td>49</td><td>24</td><td>0.0138</td></tr>
+  <tr><td>skill_builder</td><td>49</td><td>24</td><td>0.0044</td></tr>
+  <tr><td>pix</td><td>49</td><td>23</td><td>—</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="policy">6. Learned Policy</h2>
+
+<p>A single <strong>GlobalGaussianPolicy</strong> is learned (not per-round), parameterized by:</p>
+<div class="formula">π<sub>new</sub>(δ | θ) = TruncNormal(μ(θ), σ(θ)²; [δ<sub>min</sub>, δ<sub>max</sub>])</div>
+<p>with the same polynomial parameterization as the behavior policy (degree 1 for μ, degree 2 for σ).</p>
+
+<h3>Training Hyperparameters</h3>
+<table>
+  <tr><th>Hyperparameter</th><th>Value</th></tr>
+  <tr><td>Epochs</td><td>20</td></tr>
+  <tr><td>Batch size</td><td>65,536</td></tr>
+  <tr><td>Learning rate</td><td>0.005</td></tr>
+  <tr><td>Max importance weight (clipping)</td><td>20.0</td></tr>
+  <tr><td>Optimizer</td><td>Adam</td></tr>
+  <tr><td>Objectives trained</td><td>IPS, SNIPS, DR, MIS</td></tr>
+</table>
+<p>Training uses the train split; user splits are fixed (reused from prior runs where applicable). Behavior policy is fitted on train only; test is never used during training or policy fitting.</p>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="estimators">7. Estimators</h2>
+
+<p>All estimators evaluate policy value V(π) on the test split, with context weights c<sub>i</sub> and importance weights w<sub>i</sub> = π<sub>new</sub>(δ<sub>i</sub>|θ<sub>i</sub>) / π<sub>b</sub>(δ<sub>i</sub>|θ<sub>i</sub>).</p>
+
+<table>
+  <tr><th>Estimator</th><th>Formula</th><th>Notes</th></tr>
+  <tr><td><strong>IPS</strong></td><td>Σ c<sub>i</sub> w<sub>i</sub> r<sub>i</sub> / Σ c<sub>i</sub></td><td>Inverse propensity scoring</td></tr>
+  <tr><td><strong>SNIPS</strong></td><td>Σ c<sub>i</sub> w<sub>i</sub> r<sub>i</sub> / Σ c<sub>i</sub> w<sub>i</sub></td><td>Self-normalized; lower variance</td></tr>
+  <tr><td><strong>DR</strong></td><td>SNIPS + DM residual correction</td><td>Doubly robust</td></tr>
+  <tr><td><strong>MIS</strong></td><td>Marginal IS — denominator is mixture over all rounds' behavior policies</td><td>More stable weights when rounds differ</td></tr>
+  <tr><td><strong>DM</strong></td><td>IRT-based direct method (no IS)</td><td>Model-based only; oracle baseline</td></tr>
+  <tr><td><strong>ESS</strong></td><td>(Σ w<sub>i</sub>)² / Σ w<sub>i</sub>²</td><td>Effective sample size</td></tr>
+</table>
+
+<p>All estimates use <strong>cumulative</strong> scope (all rounds' data, not just last round).</p>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="results">8. Results (Test Split)</h2>
+
+<h3>Behavior Policy Baseline</h3>
+<table>
+  <tr><th>Dataset</th><th>Behavior IPS</th><th>Behavior SNIPS</th><th>Behavior DR</th><th>Behavior MIS</th><th>Behavior DM</th></tr>
+  <tr><td>attempts</td><td>2.012</td><td>1.989</td><td>2.012</td><td>2.103</td><td>2.013</td></tr>
+  <tr><td>assistments8000</td><td>0.657</td><td>0.635</td><td>0.631</td><td>0.650</td><td>0.643</td></tr>
+  <tr><td>skill_builder</td><td>0.882</td><td>0.883</td><td>0.877</td><td>0.884</td><td>0.884</td></tr>
+  <tr><td>pix</td><td>1.782</td><td>2.181</td><td>2.142</td><td>2.163</td><td>2.155</td></tr>
+</table>
+<p class="note">These are <strong>cumulative</strong> estimates over all rounds, context-reweighted toward the last round's θ distribution.</p>
+
+<h3>attempts — trunc@30, excl. rounds 5/6/7</h3>
+<table>
+  <tr><th>Policy</th><th>IPS</th><th>SNIPS</th><th>DR</th><th>MIS</th><th>DM</th></tr>
+  <tr class="behavior"><td>behavior</td><td>2.012</td><td>1.989</td><td>2.012</td><td>2.103</td><td>2.013</td></tr>
+  <tr><td>learned_ips</td><td class="highlight">2.355</td><td>2.371</td><td>2.371</td><td>2.677</td><td>2.235</td></tr>
+  <tr><td>learned_snips</td><td>2.256</td><td>2.440</td><td>2.451</td><td>2.798</td><td>2.321</td></tr>
+  <tr><td>learned_dr</td><td>2.220</td><td class="highlight">2.442</td><td class="highlight">2.456</td><td>2.785</td><td>2.334</td></tr>
+  <tr class="best"><td>learned_mis</td><td>2.348</td><td>2.463</td><td>2.472</td><td class="highlight">2.949</td><td>2.321</td></tr>
+  <tr><td>optimal_irt</td><td>1.693</td><td>2.353</td><td>2.399</td><td>2.456</td><td class="highlight">2.442</td></tr>
+</table>
+<p class="improvement">Best improvement over behavior (SNIPS): +23% (learned_dr / learned_mis)</p>
+
+<h3>assistments8000 — trunc@50</h3>
+<table>
+  <tr><th>Policy</th><th>IPS</th><th>SNIPS</th><th>DR</th><th>MIS</th><th>DM</th></tr>
+  <tr class="behavior"><td>behavior</td><td>0.657</td><td>0.635</td><td>0.631</td><td>0.650</td><td>0.643</td></tr>
+  <tr class="best"><td>learned_ips</td><td class="highlight">0.727</td><td>0.685</td><td>0.695</td><td>0.724</td><td>0.611</td></tr>
+  <tr><td>learned_snips</td><td>0.704</td><td class="highlight">0.685</td><td>0.694</td><td>0.704</td><td>0.638</td></tr>
+  <tr><td>learned_dr</td><td>0.698</td><td>0.684</td><td class="highlight">0.694</td><td>0.698</td><td class="highlight">0.648</td></tr>
+  <tr><td>learned_mis</td><td>0.707</td><td>0.622</td><td>0.596</td><td class="highlight">0.716</td><td>0.697</td></tr>
+  <tr><td>optimal_irt</td><td>0.587</td><td>0.611</td><td>0.630</td><td>0.580</td><td>0.770</td></tr>
+</table>
+<p class="improvement">Best improvement over behavior (SNIPS): +8% (learned_ips / learned_snips)</p>
+
+<h3>skill_builder — trunc@50</h3>
+<table>
+  <tr><th>Policy</th><th>IPS</th><th>SNIPS</th><th>DR</th><th>MIS</th><th>DM</th></tr>
+  <tr class="behavior"><td>behavior</td><td>0.882</td><td>0.883</td><td>0.877</td><td>0.884</td><td>0.884</td></tr>
+  <tr class="best"><td>learned_ips</td><td class="highlight">1.299</td><td>1.081</td><td>1.077</td><td class="highlight">1.298</td><td>1.086</td></tr>
+  <tr><td>learned_snips</td><td>1.191</td><td class="highlight">1.093</td><td class="highlight">1.098</td><td>1.194</td><td>1.117</td></tr>
+  <tr><td>learned_dr</td><td>1.040</td><td>1.086</td><td>1.104</td><td>1.047</td><td class="highlight">1.146</td></tr>
+  <tr><td>learned_mis</td><td>1.298</td><td>1.081</td><td>1.077</td><td>1.298</td><td>1.088</td></tr>
+  <tr><td>optimal_irt</td><td>0.759</td><td>1.054</td><td>1.094</td><td>0.776</td><td>1.172</td></tr>
+</table>
+<p class="improvement">Best improvement over behavior (SNIPS): +24% (learned_snips)</p>
+<p class="note">The high IPS for learned_ips (1.299 vs 0.882) relative to SNIPS (1.081) indicates high-variance IS weights. SNIPS and DR are more reliable estimates here.</p>
+
+<h3>pix — last 30 rounds/student, 100k users, excl. round 0</h3>
+<table>
+  <tr><th>Policy</th><th>IPS</th><th>SNIPS</th><th>DR</th><th>MIS</th><th>DM</th></tr>
+  <tr class="behavior"><td>behavior</td><td>1.782</td><td>2.181</td><td>2.142</td><td>2.163</td><td>2.155</td></tr>
+  <tr><td>learned_ips</td><td class="highlight">2.812</td><td>3.007</td><td>2.996</td><td>3.109</td><td>2.663</td></tr>
+  <tr class="best"><td>learned_snips</td><td>2.696</td><td class="highlight">3.046</td><td class="highlight">3.017</td><td>2.984</td><td>2.692</td></tr>
+  <tr><td>learned_dr</td><td>2.745</td><td>3.045</td><td>3.024</td><td>3.027</td><td class="highlight">2.697</td></tr>
+  <tr><td>learned_mis</td><td>2.737</td><td>2.599</td><td>2.603</td><td class="highlight">3.376</td><td>2.485</td></tr>
+  <tr><td>optimal_irt</td><td>2.216</td><td>2.889</td><td>2.907</td><td>2.634</td><td>2.736</td></tr>
+</table>
+<p class="improvement">Best improvement over behavior (SNIPS): +40% (learned_snips / learned_dr)</p>
+<p class="note">Round 0 auto-excluded (RMSE = 16.4 &gt; 5.0). The gap between behavior IPS (1.782) and SNIPS (2.181) reflects high IS-weight variance; SNIPS/DR are more reliable here.</p>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="coefficients">9. Learned Policy Coefficients</h2>
+
+<p>μ(θ) = β<sub>μ,0</sub> + β<sub>μ,1</sub>·θ</p>
+
+<table>
+  <tr><th>Dataset</th><th>Objective</th><th>β<sub>μ,0</sub></th><th>β<sub>μ,1</sub></th><th>β<sub>σ,0</sub></th><th>β<sub>σ,1</sub></th><th>β<sub>σ,2</sub></th></tr>
+  <tr><td rowspan="4">attempts</td><td>ips</td><td>−1.133</td><td>1.430</td><td>−0.366</td><td>−0.608</td><td>0.047</td></tr>
+  <tr><td>snips</td><td>−1.141</td><td>1.647</td><td>−0.672</td><td>−0.792</td><td>−0.046</td></tr>
+  <tr><td>dr</td><td>−1.115</td><td>1.646</td><td>−0.712</td><td>−0.832</td><td>−0.087</td></tr>
+  <tr><td>mis</td><td>−1.111</td><td>1.532</td><td>−0.758</td><td>−1.003</td><td>−0.347</td></tr>
+  <tr><td rowspan="4">assistments8000</td><td>ips</td><td>−0.525</td><td>0.215</td><td>−1.568</td><td>−0.199</td><td>−0.407</td></tr>
+  <tr><td>snips</td><td>−0.480</td><td>0.480</td><td>−1.414</td><td>−0.280</td><td>−0.312</td></tr>
+  <tr><td>dr</td><td>−0.413</td><td>0.419</td><td>−1.411</td><td>−0.209</td><td>−0.343</td></tr>
+  <tr><td>mis</td><td>0.061</td><td>0.318</td><td>−0.811</td><td>0.018</td><td>−0.358</td></tr>
+  <tr><td rowspan="4">skill_builder</td><td>ips</td><td>0.317</td><td>0.653</td><td>−1.554</td><td>−0.638</td><td>−0.600</td></tr>
+  <tr><td>snips</td><td>0.378</td><td>1.011</td><td>−0.976</td><td>−0.618</td><td>−0.713</td></tr>
+  <tr><td>dr</td><td>0.569</td><td>1.231</td><td>−1.129</td><td>−0.519</td><td>−0.577</td></tr>
+  <tr><td>mis</td><td>0.332</td><td>0.641</td><td>−1.544</td><td>−0.638</td><td>−0.600</td></tr>
+  <tr><td rowspan="4">pix</td><td>ips</td><td>−0.169</td><td>1.080</td><td>−1.860</td><td>−0.981</td><td>1.266</td></tr>
+  <tr><td>snips</td><td>−0.226</td><td>0.974</td><td>−1.616</td><td>−0.053</td><td>−0.508</td></tr>
+  <tr><td>dr</td><td>−0.202</td><td>0.915</td><td>−1.620</td><td>0.124</td><td>−0.514</td></tr>
+  <tr><td>mis</td><td>0.170</td><td>0.107</td><td>−1.880</td><td>−1.077</td><td>−1.084</td></tr>
+</table>
+<p>All datasets learn a <strong>positive β<sub>μ,1</sub></strong> (assign harder items to higher-proficiency students), consistent with IRT theory. The intercept β<sub>μ,0</sub> varies with the dataset's difficulty range.</p>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="technical">10. Key Technical Notes (v2 Fixes)</h2>
+
+<h3>Truncated Gaussian Support Expansion</h3>
+<p>δ<sub>min</sub> and δ<sub>max</sub> are expanded by 1×10<sup>−4</sup> before fitting and policy evaluation. This prevents float32 boundary rejection: observations exactly at δ<sub>min</sub> in float64 become slightly outside support after float32 round-trip inside <code>GlobalGaussianPolicy.log_prob</code>.</p>
+
+<h3>scipy / PyTorch Propensity Alignment</h3>
+<p><code>propensity.py</code> now uses <code>log_ndtr</code> with the same survival-function branch switching as <code>GlobalGaussianPolicy.log_prob</code>. This ensures behavior-policy IS weights average to ≈ 1.0 (previously showed min = −23.56, std = 1.71 in log-weight space).</p>
+
+<h3>Degenerate Behavior Policy Detection</h3>
+<p>Rounds where L-BFGS-B finds μ ≪ δ<sub>min</sub> with huge σ (near-uniform approximation of a bimodal/boundary-spiked distribution) are detected via RMSE &gt; 5.0 and excluded from data and MIS mixture. Root cause: bimodal difficulty distributions with a spike at δ<sub>min</sub>, growing from ~9% at round 5 to ~20% at round 7 in the attempts dataset.</p>
+
+<!-- ═══════════════════════════════════════════════ -->
+<h2 id="files">11. Output Files (per run)</h2>
+
+<table>
+  <tr><th>File</th><th>Contents</th></tr>
+  <tr><td><code>estimator_results_by_split.csv</code></td><td>IPS/SNIPS/DR/MIS/DM per policy and split</td></tr>
+  <tr><td><code>gaussian_fit_train_by_order.csv</code></td><td>Behavior policy coefficients and fit stats per round</td></tr>
+  <tr><td><code>learned_policy_coefficients.csv</code></td><td>β<sub>μ</sub>, β<sub>σ</sub> for each trained objective</td></tr>
+  <tr><td><code>training_history.csv</code></td><td>Train loss per epoch per objective</td></tr>
+  <tr><td><code>split_summary.csv</code></td><td>n_users, n_rows, n_eval per split</td></tr>
+  <tr><td><code>run_summary.csv</code></td><td>All hyperparameters and metadata</td></tr>
+  <tr><td><code>user_split_assignments.csv</code></td><td>User → split mapping</td></tr>
+  <tr><td><code>round_bucket_mapping.csv</code></td><td>Round mapping and observation counts</td></tr>
+</table>
+
+<h3>Result Directories</h3>
+<table>
+  <tr><th>Dataset</th><th>Directory</th></tr>
+  <tr><td>attempts</td><td><code>results/attempts_v2_trunc30_ep20/</code></td></tr>
+  <tr><td>assistments8000</td><td><code>results/assistments8000_v2_trunc50_ep20/</code></td></tr>
+  <tr><td>skill_builder</td><td><code>results/skill_builder_v2_trunc50_ep20/</code></td></tr>
+  <tr><td>pix</td><td><code>results/pix_v2_trunc30_ep20/</code></td></tr>
+</table>
+
+<hr>
+<p class="meta">Generated 2026-03-12 | geometric_flow / offpolicy_ktm_pipeline</p>
+</body>
+</html>

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sensitivity Analysis — Proficiency Noise</title>
+<style>
+  body { font-family: sans-serif; max-width: 1200px; margin: 40px auto; color: #222; }
+  h1, h2, h3 { border-bottom: 1px solid #ccc; padding-bottom: 6px; }
+  table { border-collapse: collapse; margin: 16px 0; }
+  th, td { border: 1px solid #bbb; padding: 7px 14px; text-align: right; }
+  th { background: #f0f0f0; }
+  td:first-child, td:nth-child(2), th:first-child, th:nth-child(2) { text-align: left; }
+  .best { font-weight: bold; }
+  .sep { border-top: 2px solid #888; }
+  .above { color: #2a7a2a; }
+  .below { color: #b00; }
+  pre { background: #f6f6f6; padding: 16px; border-radius: 4px; overflow-x: auto; font-size: 13px; }
+  img { max-width: 100%; margin: 12px 0; border: 1px solid #ddd; border-radius: 4px; }
+  .meta { color: #555; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { border: 1px solid #ddd; border-radius: 6px; padding: 12px; }
+  .card h3 { margin-top: 0; font-size: 15px; }
+  .delta-pos { color: #2a7a2a; font-size: 12px; }
+  .delta-neg { color: #b00; font-size: 12px; }
+  .delta-neu { color: #888; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>Sensitivity Analysis: Proficiency Noise</h1>
+<p class="meta">
+  Dataset: <code>attempts.csv</code> &nbsp;|&nbsp;
+  Truncate-at-round: 30 &nbsp;|&nbsp;
+  Epochs: 20 &nbsp;|&nbsp;
+  Noise: N(0, &sigma;) added to proficiency &theta; before behavior fitting and training &nbsp;|&nbsp;
+  Noise levels: &sigma; &isin; {0.0 (baseline), 0.1, 0.2}
+</p>
+
+<h2>What This Experiment Tests</h2>
+<p>
+  We inject Gaussian noise N(0,&sigma;) into the proficiency estimates &theta; <strong>before</strong>
+  behavior policy fitting and before learned policy training. This simulates measurement error
+  in the context variable — e.g., if the KTM proficiency estimates are noisy or miscalibrated.
+  The question is: how sensitive are the learned policies (and their off-policy evaluations) to
+  this noise?
+</p>
+<p>
+  The behavior policy is also re-fitted with the noisy &theta;, so the entire pipeline (behavior
+  fit, importance weights, training) is affected consistently. The <strong>baseline (&sigma;=0.0)</strong>
+  is the original <code>attempts_trunc30</code> experiment.
+</p>
+
+<h2>Are Learned Policies Always Better Than Behavior?</h2>
+<p>
+  <strong>Yes — at every noise level, every learned policy beats the behavior policy on every estimator.</strong>
+  This holds for all four objectives (IPS, SNIPS, DR, MIS) and across &sigma; &isin; {0.0, 0.1, 0.2}.
+  The policy improvement signal is robust to proficiency noise.
+</p>
+
+<h2>Results by Noise Level</h2>
+<p>Bold = best among learned policies per estimator column. Green/red deltas show change vs &sigma;=0.0 baseline.</p>
+
+<h3>&sigma; = 0.0 (Baseline)</h3>
+<table>
+  <thead>
+    <tr><th>Policy</th><th>Trained Obj.</th><th>IPS</th><th>SNIPS</th><th>DR</th><th>MIS</th><th>DM</th><th>ESS (logged)</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Behavior</td><td>—</td><td>1.782</td><td>1.660</td><td>1.640</td><td>1.661</td><td>1.521</td><td>71,696</td></tr>
+    <tr><td>Optimal (IRT)</td><td>—</td><td>1.850</td><td>2.473</td><td>2.476</td><td>2.678</td><td>2.436</td><td>16,641</td></tr>
+    <tr class="sep">
+      <td>Learned (IPS)</td><td>ips</td><td class="best">3.125</td><td>2.501</td><td>2.543</td><td>3.239</td><td>2.279</td><td>35,231</td>
+    </tr>
+    <tr><td>Learned (SNIPS)</td><td>snips</td><td>2.756</td><td class="best">2.616</td><td>2.636</td><td>3.374</td><td>2.322</td><td>25,959</td></tr>
+    <tr><td>Learned (DR)</td><td>dr</td><td>2.846</td><td>2.611</td><td class="best">2.637</td><td>3.416</td><td>2.310</td><td>27,020</td></tr>
+    <tr><td>Learned (MIS)</td><td>mis</td><td>2.807</td><td>2.571</td><td>2.603</td><td class="best">3.439</td><td class="best">2.346</td><td>28,161</td></tr>
+  </tbody>
+</table>
+
+<h3>&sigma; = 0.1</h3>
+<table>
+  <thead>
+    <tr><th>Policy</th><th>Trained Obj.</th><th>IPS</th><th>SNIPS</th><th>DR</th><th>MIS</th><th>DM</th><th>ESS (logged)</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Behavior</td><td>—</td>
+      <td>1.726 <span class="delta-neg">(&minus;0.056)</span></td>
+      <td>1.600 <span class="delta-neg">(&minus;0.060)</span></td>
+      <td>1.584 <span class="delta-neg">(&minus;0.056)</span></td>
+      <td>1.625 <span class="delta-neg">(&minus;0.036)</span></td>
+      <td>1.528 <span class="delta-pos">(+0.007)</span></td>
+      <td>72,883</td>
+    </tr>
+    <tr>
+      <td>Optimal (IRT)</td><td>—</td>
+      <td>1.732 <span class="delta-neg">(&minus;0.118)</span></td>
+      <td>2.396 <span class="delta-neg">(&minus;0.077)</span></td>
+      <td>2.425 <span class="delta-neg">(&minus;0.051)</span></td>
+      <td>2.507 <span class="delta-neg">(&minus;0.171)</span></td>
+      <td>2.436 <span class="delta-neu">(+0.000)</span></td>
+      <td>17,006</td>
+    </tr>
+    <tr class="sep">
+      <td>Learned (IPS)</td><td>ips</td>
+      <td class="best">3.169 <span class="delta-pos">(+0.044)</span></td>
+      <td>2.324 <span class="delta-neg">(&minus;0.177)</span></td>
+      <td>2.346 <span class="delta-neg">(&minus;0.197)</span></td>
+      <td>3.220 <span class="delta-neg">(&minus;0.019)</span></td>
+      <td>2.269 <span class="delta-neg">(&minus;0.010)</span></td>
+      <td>33,702</td>
+    </tr>
+    <tr>
+      <td>Learned (SNIPS)</td><td>snips</td>
+      <td>2.623 <span class="delta-neg">(&minus;0.133)</span></td>
+      <td class="best">2.476 <span class="delta-neg">(&minus;0.140)</span></td>
+      <td>2.491 <span class="delta-neg">(&minus;0.145)</span></td>
+      <td>3.106 <span class="delta-neg">(&minus;0.268)</span></td>
+      <td>2.306 <span class="delta-neg">(&minus;0.016)</span></td>
+      <td>27,866</td>
+    </tr>
+    <tr>
+      <td>Learned (DR)</td><td>dr</td>
+      <td>2.618 <span class="delta-neg">(&minus;0.228)</span></td>
+      <td>2.473 <span class="delta-neg">(&minus;0.138)</span></td>
+      <td class="best">2.492 <span class="delta-neg">(&minus;0.145)</span></td>
+      <td>3.121 <span class="delta-neg">(&minus;0.295)</span></td>
+      <td>2.321 <span class="delta-pos">(+0.011)</span></td>
+      <td>27,740</td>
+    </tr>
+    <tr>
+      <td>Learned (MIS)</td><td>mis</td>
+      <td>2.712 <span class="delta-neg">(&minus;0.095)</span></td>
+      <td>2.440 <span class="delta-neg">(&minus;0.131)</span></td>
+      <td>2.473 <span class="delta-neg">(&minus;0.130)</span></td>
+      <td class="best">3.211 <span class="delta-neg">(&minus;0.228)</span></td>
+      <td class="best">2.351 <span class="delta-pos">(+0.005)</span></td>
+      <td>29,418</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>&sigma; = 0.2</h3>
+<table>
+  <thead>
+    <tr><th>Policy</th><th>Trained Obj.</th><th>IPS</th><th>SNIPS</th><th>DR</th><th>MIS</th><th>DM</th><th>ESS (logged)</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Behavior</td><td>—</td>
+      <td>1.707 <span class="delta-neg">(&minus;0.075)</span></td>
+      <td>1.582 <span class="delta-neg">(&minus;0.078)</span></td>
+      <td>1.566 <span class="delta-neg">(&minus;0.074)</span></td>
+      <td>1.615 <span class="delta-neg">(&minus;0.046)</span></td>
+      <td>1.543 <span class="delta-pos">(+0.022)</span></td>
+      <td>73,956</td>
+    </tr>
+    <tr>
+      <td>Optimal (IRT)</td><td>—</td>
+      <td>1.688 <span class="delta-neg">(&minus;0.162)</span></td>
+      <td>2.372 <span class="delta-neg">(&minus;0.101)</span></td>
+      <td>2.423 <span class="delta-neg">(&minus;0.053)</span></td>
+      <td>2.401 <span class="delta-neg">(&minus;0.277)</span></td>
+      <td>2.438 <span class="delta-pos">(+0.002)</span></td>
+      <td>17,000</td>
+    </tr>
+    <tr class="sep">
+      <td>Learned (IPS)</td><td>ips</td>
+      <td class="best">3.214 <span class="delta-pos">(+0.089)</span></td>
+      <td>2.276 <span class="delta-neg">(&minus;0.225)</span></td>
+      <td>2.288 <span class="delta-neg">(&minus;0.255)</span></td>
+      <td class="best">3.260 <span class="delta-pos">(+0.021)</span></td>
+      <td>2.264 <span class="delta-neg">(&minus;0.015)</span></td>
+      <td>34,078</td>
+    </tr>
+    <tr>
+      <td>Learned (SNIPS)</td><td>snips</td>
+      <td>2.522 <span class="delta-neg">(&minus;0.234)</span></td>
+      <td class="best">2.392 <span class="delta-neg">(&minus;0.224)</span></td>
+      <td>2.425 <span class="delta-neg">(&minus;0.211)</span></td>
+      <td>2.861 <span class="delta-neg">(&minus;0.513)</span></td>
+      <td>2.333 <span class="delta-pos">(+0.011)</span></td>
+      <td>30,930</td>
+    </tr>
+    <tr>
+      <td>Learned (DR)</td><td>dr</td>
+      <td>2.256 <span class="delta-neg">(&minus;0.590)</span></td>
+      <td>2.379 <span class="delta-neg">(&minus;0.232)</span></td>
+      <td class="best">2.432 <span class="delta-neg">(&minus;0.205)</span></td>
+      <td>2.726 <span class="delta-neg">(&minus;0.690)</span></td>
+      <td class="best">2.376 <span class="delta-pos">(+0.066)</span></td>
+      <td>24,543</td>
+    </tr>
+    <tr>
+      <td>Learned (MIS)</td><td>mis</td>
+      <td>2.801 <span class="delta-pos">(+0.006)</span></td>
+      <td>2.362 <span class="delta-neg">(&minus;0.209)</span></td>
+      <td>2.400 <span class="delta-neg">(&minus;0.203)</span></td>
+      <td>3.113 <span class="delta-neg">(&minus;0.326)</span></td>
+      <td>2.348 <span class="delta-pos">(+0.002)</span></td>
+      <td>31,004</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Estimator Sensitivity Summary</h2>
+<p>Change in best learned policy value vs &sigma;=0.0 baseline, per estimator:</p>
+<table>
+  <thead>
+    <tr><th>Estimator</th><th>Best at &sigma;=0.0</th><th>Best at &sigma;=0.1</th><th>&Delta;</th><th>Best at &sigma;=0.2</th><th>&Delta;</th><th>Sensitivity</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>IPS</td><td>3.125</td><td>3.169</td><td class="delta-pos">+0.044</td><td>3.214</td><td class="delta-pos">+0.089</td><td>Low (inflated by noise)</td></tr>
+    <tr><td>SNIPS</td><td>2.616</td><td>2.476</td><td class="delta-neg">&minus;0.140</td><td>2.392</td><td class="delta-neg">&minus;0.224</td><td><strong>Moderate</strong></td></tr>
+    <tr><td>DR</td><td>2.637</td><td>2.492</td><td class="delta-neg">&minus;0.145</td><td>2.432</td><td class="delta-neg">&minus;0.205</td><td><strong>Moderate</strong></td></tr>
+    <tr><td>MIS</td><td>3.439</td><td>3.211</td><td class="delta-neg">&minus;0.228</td><td>3.260</td><td class="delta-neg">&minus;0.179</td><td><strong>Moderate</strong></td></tr>
+    <tr><td>DM</td><td>2.346</td><td>2.351</td><td class="delta-pos">+0.005</td><td>2.376</td><td class="delta-pos">+0.030</td><td><strong>Very low (robust)</strong></td></tr>
+  </tbody>
+</table>
+
+<h2>Discussion</h2>
+
+<h3>Learned Policies Always Beat Behavior</h3>
+<p>
+  Across all three noise levels (&sigma; = 0.0, 0.1, 0.2) and all five estimators (IPS, SNIPS, DR, MIS, DM),
+  every learned policy outperforms the behavior policy. The policy improvement signal is <strong>robust to
+  proficiency noise</strong>: even with substantial context corruption (&sigma;=0.2 is ~14% of the difficulty
+  range [&minus;3.7, 2.6]), the policies still find meaningfully better difficulty assignments.
+</p>
+
+<h3>IPS Appears to Improve Under Noise — But This Is an Artifact</h3>
+<p>
+  IPS values for learned policies <em>increase</em> with noise (Learned IPS: 3.125 &rarr; 3.169 &rarr; 3.214).
+  This is not a genuine improvement. When proficiency is noisy, the behavior policy is fitted
+  to a noisier context distribution — making it appear more diffuse (higher variance). A more diffuse
+  behavior policy means that even when the learned policy picks a different action, the importance
+  weight &pi;<sub>learned</sub>/&pi;<sub>behavior</sub> stays larger rather than collapsing. IPS
+  is therefore <strong>upward biased</strong> under noise because the propensity denominator is inflated.
+</p>
+<p>
+  This is a known pathology: IPS without normalization is unreliable when the propensity model is misspecified.
+</p>
+
+<h3>SNIPS and DR Are the Most Informative Estimators</h3>
+<p>
+  SNIPS and DR both show a consistent, moderate decline with noise (~8% and ~8% respectively at &sigma;=0.2).
+  This makes intuitive sense: noisier proficiency leads to noisier importance weights, and the
+  self-normalized SNIPS estimator is more honest about policy quality than raw IPS.
+  The decline is gradual rather than catastrophic, suggesting the pipeline is reasonably
+  robust.
+</p>
+
+<h3>DM Is Remarkably Stable</h3>
+<p>
+  The DM (Direct Method) estimator barely changes across noise levels (2.346 &rarr; 2.351 &rarr; 2.376 for the
+  best policy). DM evaluates the learned reward model directly under the policy's action distribution,
+  bypassing importance weights entirely. Since the reward model captures the true
+  reward-difficulty-proficiency relationship and is only weakly sensitive to the exact proficiency
+  value used during training, DM remains stable. This further validates DM as the most reliable
+  estimator when importance weight variance is a concern.
+</p>
+
+<h3>Learned (IPS) vs Learned (DR) Under High Noise</h3>
+<p>
+  An interesting reversal occurs at &sigma;=0.2: Learned (DR)'s IPS score drops dramatically
+  (2.846 &rarr; 2.256, &minus;0.590) while Learned (IPS) stays high. This suggests the DR objective
+  is more sensitive to proficiency noise in its gradient signal — the direct model component of DR
+  becomes miscalibrated under noisy theta, leading the policy to different regions of the action space
+  that look worse under IPS. However, Learned (DR) achieves the best DM score (2.376) at &sigma;=0.2,
+  suggesting it may still be finding a good policy that IPS just can't evaluate well.
+</p>
+
+<h2>Policy Comparison Plots</h2>
+
+<div class="grid">
+  <div class="card">
+    <h3>&sigma; = 0.0 (Baseline)</h3>
+    <img src="../attempts_trunc30/policy_comparison_by_objective.png" alt="Policy comparison sigma=0.0">
+  </div>
+  <div class="card">
+    <h3>&sigma; = 0.1</h3>
+    <img src="../attempts_sensitivity_0p10/policy_comparison_by_objective.png" alt="Policy comparison sigma=0.1">
+  </div>
+  <div class="card">
+    <h3>&sigma; = 0.2</h3>
+    <img src="../attempts_sensitivity_0p20/policy_comparison_by_objective.png" alt="Policy comparison sigma=0.2">
+  </div>
+</div>
+
+<h2>Behavior Policy Evolution</h2>
+<div class="grid">
+  <div class="card">
+    <h3>&sigma; = 0.0 (Baseline)</h3>
+    <img src="../attempts_trunc30/behavior_evolution_by_round.png" alt="Behavior evolution sigma=0.0">
+  </div>
+  <div class="card">
+    <h3>&sigma; = 0.1</h3>
+    <img src="../attempts_sensitivity_0p10/behavior_evolution_by_round.png" alt="Behavior evolution sigma=0.1">
+  </div>
+  <div class="card">
+    <h3>&sigma; = 0.2</h3>
+    <img src="../attempts_sensitivity_0p20/behavior_evolution_by_round.png" alt="Behavior evolution sigma=0.2">
+  </div>
+</div>
+
+</body>
+</html>
