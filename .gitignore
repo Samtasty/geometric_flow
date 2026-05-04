@@ -4,6 +4,7 @@ data/
 # Large pix_mapping files
 pix_mapping/pix_irt_outcome.pt
 pix_mapping/pix_processed.csv
+pix_mapping/results_certif.csv
 
 # Heavy notebooks
 notebooks/ktm_gaussian_animation.executed.ipynb
