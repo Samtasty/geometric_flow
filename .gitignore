@@ -1,6 +1,10 @@
 # Data
 data/
 
+# Large pix_mapping files
+pix_mapping/pix_irt_outcome.pt
+pix_mapping/pix_processed.csv
+
 # Heavy notebooks
 notebooks/ktm_gaussian_animation.executed.ipynb
 notebooks/efa_competence.ipynb
